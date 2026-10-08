@@ -1,0 +1,7 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {initialState,amountInPence,updateBalance,validState} from './model.js';
+test('balances track borrowing and repayment independently, using exact pennies',()=>{let s=initialState();s=updateBalance(s,'Flex',amountInPence('1200.25'),'set');s=updateBalance(s,'Lloyd’s',amountInPence('900'),'set');s=updateBalance(s,'Flex',amountInPence('200'),'pay');s=updateBalance(s,'Klarna',amountInPence('30.10'),'add');assert.equal(s.balances.Flex,100025);assert.equal(s.balances['Lloyd’s'],90000);assert.equal(s.balances.Klarna,3010);assert.equal(s.history.length,4);assert.equal(s.history[0].before,0);assert.ok(validState(s));});
+test('rejects overpayment and malformed amounts',()=>{assert.throws(()=>updateBalance(initialState(),'Flex',20000,'pay'),/more than/);for(const value of ['-1','1.001','NaN','1e3','0','Infinity'])assert.throws(()=>amountInPence(value));assert.equal(amountInPence('0.29'),29);});
+test('full repayment and zero balance are supported',()=>{let s=updateBalance(initialState(),'Flex',20000,'set');s=updateBalance(s,'Flex',20000,'pay');assert.equal(s.balances.Flex,0);assert.equal(s.history[0].before,20000);assert.ok(validState(updateBalance(s,'Klarna',0,'set')));});
+test('invalid backup data is rejected',()=>{assert.equal(validState({balances:{},history:[]}),false);const s=initialState();s.history=[{category:'Flex',amount:2}];assert.equal(validState(s),false);});
