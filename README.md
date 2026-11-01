@@ -2,7 +2,7 @@
 
 ## Balance
 
-A responsive, installable debt tracker for Flex, Lloyd’s, and Klarna. Set account balances, add borrowing, record repayments, and undo the latest update. Amounts are stored as integer pennies in GBP. No account, bank connection, or API keys are required.
+A responsive, installable debt tracker for Flex, Lloyd’s, and Klarna. Swipe through your account cards and use the plus button to add a debt or bill with a name and remaining balance. Every account is included in the total, repayments, and borrowing. Set account balances, add borrowing, record repayments, and undo the latest update. Amounts are stored as integer pennies in GBP. No account, bank connection, or API keys are required.
 
 ## Run
 

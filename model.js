@@ -7,7 +7,7 @@ export function amountInPence(value) {
   return n;
 }
 export function updateBalance(state, category, amount, action) {
-  if (!categories.includes(category) || !['add', 'pay', 'set'].includes(action)) throw new Error('Choose an account and action.');
+  if (!Object.hasOwn(state.balances, category) || !['add', 'pay', 'set'].includes(action)) throw new Error('Choose an account and action.');
   if (!Number.isSafeInteger(amount) || amount < 0 || (action !== 'set' && amount === 0)) throw new Error('Enter a valid amount.');
   const old = state.balances[category];
   const next = action === 'set' ? amount : old + (action === 'pay' ? -amount : amount);
@@ -15,8 +15,19 @@ export function updateBalance(state, category, amount, action) {
   if (!Number.isSafeInteger(next)) throw new Error('This amount is too large.');
   return { balances: { ...state.balances, [category]: next }, history: [{id: crypto.randomUUID(), category, action, amount, before: old, after: next, date: new Date().toISOString()}, ...state.history] };
 }
+const validName = name => typeof name === 'string' && name.trim() === name && name.length > 0 && name.length <= 60 && !['__proto__', 'prototype', 'constructor'].includes(name);
+export const accountNames = state => Object.keys(state.balances);
+export function createAccount(state, name, amount) {
+  name = String(name).trim();
+  if (!validName(name)) throw new Error('Enter a name between 1 and 60 characters.');
+  if (accountNames(state).some(c => c.toLocaleLowerCase('en-GB') === name.toLocaleLowerCase('en-GB'))) throw new Error('An account with this name already exists.');
+  if (!Number.isSafeInteger(amount) || amount < 0) throw new Error('Enter a valid remaining balance.');
+  return updateBalance({ ...state, balances: { ...state.balances, [name]: 0 } }, name, amount, 'set');
+}
 export function validState(s) {
-  return s && categories.every(c => Number.isSafeInteger(s.balances?.[c]) && s.balances[c] >= 0) && Array.isArray(s.history) && s.history.every(h => categories.includes(h.category) && ['set','pay','add'].includes(h.action) && Number.isSafeInteger(h.amount) && h.amount >= 0 && Number.isSafeInteger(h.before) && h.before >= 0 && Number.isSafeInteger(h.after) && h.after >= 0 && typeof h.id === 'string' && !isNaN(Date.parse(h.date)));
+  if (!s || !s.balances || typeof s.balances !== 'object' || Array.isArray(s.balances)) return false;
+  const names = accountNames(s);
+  return categories.every(c => Object.hasOwn(s.balances, c)) && names.every(c => validName(c) && Number.isSafeInteger(s.balances[c]) && s.balances[c] >= 0) && new Set(names.map(c => c.toLocaleLowerCase('en-GB'))).size === names.length && Array.isArray(s.history) && s.history.every(h => h && names.includes(h.category) && ['set','pay','add'].includes(h.action) && Number.isSafeInteger(h.amount) && h.amount >= 0 && Number.isSafeInteger(h.before) && h.before >= 0 && Number.isSafeInteger(h.after) && h.after >= 0 && typeof h.id === 'string' && !isNaN(Date.parse(h.date)));
 }
 
 // Preserve balances and activity from the account’s original label.
