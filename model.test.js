@@ -35,3 +35,24 @@ test('legacy Plana balances and activity migrate without losing custom accounts'
   assert.equal(migrated.history[1].category, 'Klarna');
   assert.ok(validState(migrated));
 });
+
+test('spending allocations use exact pennies and survive debt updates and backups', async () => {
+  const {adjustBudget, createBudget, migrateState} = await import('./model.js');
+  let s = adjustBudget(initialState(), 'groceries', 18320, 'add');
+  s = adjustBudget(s, 'groceries', 320, 'remove');
+  assert.equal(s.budgets[0].remaining, 18000);
+  s = adjustBudget(s, 'groceries', 1000, 'add');
+  assert.equal(s.budgets[0].remaining, 19000);
+  assert.equal(s.budgets[0].allocated, 19320);
+  assert.throws(() => adjustBudget(s, 'groceries', 19001, 'remove'), /more than/);
+  for (const n of [0, -1, 0.1, Infinity]) assert.throws(() => adjustBudget(s, 'groceries', n, 'add'));
+  s = createBudget(s, 'Travel', 5000, '🚌');
+  assert.throws(() => createBudget(s, 'travel', 5000), /already exists/);
+  const budgets = s.budgets;
+  s = updateBalance(s, 'Flex', 100, 'add');
+  assert.deepEqual(s.budgets, budgets);
+  assert.equal(s.balances.Flex, 100);
+  assert.ok(validState(migrateState(JSON.parse(JSON.stringify(s)))));
+  assert.ok(validState(initialState()));
+  assert.equal(validState({...s, budgets: [{id: 'bad', remaining: -1}]}), false);
+});

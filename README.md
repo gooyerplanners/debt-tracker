@@ -28,3 +28,7 @@ Balances and activity live in this browser’s local storage. They do not sync b
 5. Open the live website on your phone and use **Add to your phone**, or Safari’s Share → Add to Home Screen.
 
 `npm run build` creates the deployable static site in `dist/`. Only application assets are published; tests, repository metadata, and development scripts are excluded. All application paths are relative, including the manifest and service worker, to support GitHub Pages’ `/debt-tracker/` path. You can also upload `dist/` to another static HTTPS host. Publishing the cloud development environment is separate from deploying this website.
+
+## Spending allocations
+
+A small spending section starts with Groceries and Shopping at £0. Tap an allocation to add money or remove spending; add more named allocations with the Add button. The bar shows remaining money against the total allocated, without percentages. Top-ups increase both remaining and allocated amounts. Spending is separate from debt totals, and allocations are included in device storage and downloaded backups. Older debt-only backups still restore normally.
