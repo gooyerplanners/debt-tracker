@@ -13,7 +13,7 @@ npm start
 npm test
 ```
 
-The development server listens on port 3000. Deploy these static files to an HTTPS host to use it on a phone. In Safari use Share → Add to Home Screen; in Chrome use Install app / Add to Home screen. The app caches its files for offline use after the first successful visit. Increment the cache version in `sw.js` when shipping changed assets.
+The development server listens on port 3000. Deploy these static files to an HTTPS host to use it on a phone. In Safari use Share → Add to Home Screen; in Chrome use Install app / Add to Home screen. The app caches its files for offline use after the first successful visit. Increment the cache version in `sw.js` when shipping changed assets. Installed apps check for updates on reopening, returning to the foreground, and reconnecting. New releases show an “Update available” prompt; finish any unsaved entry and tap “Update now”. Updating retains balances and activity in local storage and does not require reinstalling. The installation button is hidden in Home Screen mode.
 
 ## Your data
 

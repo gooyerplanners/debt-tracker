@@ -49,7 +49,7 @@ $('file').onchange=async()=>{try {const file=$('file').files[0];if(!file)return;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;});
 $('install').onclick=async()=>{if(deferredInstall){await deferredInstall.prompt();deferredInstall=null;}else $('install-dialog').showModal();};
 $('close-install').onclick=()=>$('install-dialog').close();
-if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
 window.addEventListener('storage',e=>{if(e.key===key){try{const next=e.newValue?migrateState(JSON.parse(e.newValue)):initialState();if(validState(next)){state=next;render();notify('Balances updated from another tab.');}}catch{notify('Could not read the update from another tab.',true);}}});
 render();
 
@@ -79,3 +79,45 @@ $('account-form').onsubmit = e => {
     }
   } catch (error) { $('account-error').textContent = error.message; }
 };
+
+// iOS exposes navigator.standalone; other installed browsers use display-mode.
+const standalone = window.matchMedia('(display-mode: standalone)');
+function updateInstallButton() { $('install').hidden = standalone.matches || navigator.standalone === true; }
+updateInstallButton();
+standalone.addEventListener('change', updateInstallButton);
+window.addEventListener('appinstalled', () => { $('install').hidden = true; });
+
+if ('serviceWorker' in navigator) {
+  let waitingWorker;
+  let applyingUpdate = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (applyingUpdate) window.location.reload();
+  });
+  function offerUpdate(registration) {
+    if (!registration.waiting || !navigator.serviceWorker.controller) return;
+    waitingWorker = registration.waiting;
+    $('update-banner').hidden = false;
+  }
+  $('apply-update').onclick = () => {
+    if (!waitingWorker) return;
+    applyingUpdate = true;
+    $('apply-update').disabled = true;
+    $('apply-update').textContent = 'Updating…';
+    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+  };
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(registration => {
+    offerUpdate(registration);
+    registration.addEventListener('updatefound', () => {
+      const worker = registration.installing;
+      worker?.addEventListener('statechange', () => {
+        if (worker.state === 'installed') offerUpdate(registration);
+      });
+    });
+    const check = () => registration.update().then(() => offerUpdate(registration)).catch(() => {});
+    // Check again when returning to a Home Screen app that was left open.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    window.addEventListener('pageshow', check);
+    window.addEventListener('online', check);
+    check();
+  }).catch(() => {});
+}
