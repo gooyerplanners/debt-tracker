@@ -38,7 +38,7 @@ test('legacy Plana balances and activity migrate without losing custom accounts'
 
 test('spending allocations use exact pennies and survive debt updates and backups', async () => {
   const {adjustBudget, createBudget, migrateState} = await import('./model.js');
-  let s = adjustBudget(initialState(), 'groceries', 18320, 'add');
+  let s = adjustBudget({...initialState(), budgets: [{id:'groceries',name:'Groceries',icon:'🛒',remaining:0,allocated:0}]}, 'groceries', 18320, 'add');
   s = adjustBudget(s, 'groceries', 320, 'remove');
   assert.equal(s.budgets[0].remaining, 18000);
   s = adjustBudget(s, 'groceries', 1000, 'add');
@@ -55,4 +55,21 @@ test('spending allocations use exact pennies and survive debt updates and backup
   assert.ok(validState(migrateState(JSON.parse(JSON.stringify(s)))));
   assert.ok(validState(initialState()));
   assert.equal(validState({...s, budgets: [{id: 'bad', remaining: -1}]}), false);
+});
+
+
+test('allocation edits preserve money and deletion persists without affecting debts', async () => {
+  const {createBudget, editBudget, deleteBudget, initialBudgets} = await import('./model.js');
+  assert.deepEqual(initialBudgets(), []);
+  let s = createBudget(initialState(), 'Example', 18320, '🛒');
+  const id = s.budgets[0].id;
+  s = editBudget(s, id, 'Transport', '🚆');
+  assert.deepEqual(s.budgets[0], {id, name:'Transport', icon:'🚆', remaining:18320, allocated:18320});
+  assert.throws(() => editBudget(s, id, 'Transport', 'abc'), /emoji/);
+  s = editBudget(s, id, 'Family', '👨‍👩‍👧‍👦');
+  assert.ok(validState(JSON.parse(JSON.stringify(s))));
+  s = deleteBudget(s, id);
+  assert.deepEqual(s.budgets, []);
+  assert.equal(s.balances.Flex, 0);
+  assert.ok(validState(s));
 });

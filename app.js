@@ -1,9 +1,10 @@
-import { initialBudgets, createBudget, adjustBudget, accountNames, createAccount, initialState, amountInPence, updateBalance, validState, migrateState } from './model.js';
+import { editBudget, deleteBudget, initialBudgets, createBudget, adjustBudget, accountNames, createAccount, initialState, amountInPence, updateBalance, validState, migrateState } from './model.js';
 const $ = id => document.getElementById(id);
 const arrow = '<svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg>';
 const key = 'balance-debt-tracker-v1';
 const money = n => new Intl.NumberFormat('en-GB', {style:'currency',currency:'GBP'}).format(n/100);
-let selectedBudget;
+let selectedBudget, editingBudget;
+let historyExpanded = false;
 let state = initialState(), action = 'pay', editing, deferredInstall;
 try { const saved = localStorage.getItem(key); if (saved) { const parsed = migrateState(JSON.parse(saved)); if (!validState(parsed)) throw Error(); state = parsed; } }
 catch { $('message').textContent = 'Saved data could not be loaded. Restore a backup before recording new changes.'; $('message').className = 'error'; }
@@ -28,9 +29,12 @@ function render() {
     return el;
   }));
   $('count').textContent = `${state.history.length} updates`;
+  $('history-toggle').hidden = state.history.length <= 4;
+  $('history-toggle').textContent = historyExpanded ? 'See less' : 'See more';
+  $('history-toggle').setAttribute('aria-expanded', String(historyExpanded));
   $('history').replaceChildren();
   if (!state.history.length) { $('history').innerHTML = '<div class="empty"><span class="empty-icon"><svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg></span><strong>A fresh start.</strong><br>Set your balances above, then record<br>your first update here.</div>'; return; }
-  state.history.slice(0,8).forEach((h,i) => {
+  state.history.slice(0, historyExpanded ? state.history.length : 4).forEach((h,i) => {
     const el = document.createElement('div'); el.className='activity'; styleAccount(el, h.category);
     const icon = document.createElement('span'); icon.className='activity-icon'; icon.innerHTML=h.action==='pay'?arrow.replace('arrow-icon','arrow-icon down'):h.action==='add'?'+':'=';
     const info = document.createElement('div'); info.className='activity-info';
@@ -140,6 +144,7 @@ if ('serviceWorker' in navigator) {
 function renderBudgets() {
   const budgets = state.budgets ?? initialBudgets();
   $('budget-total').textContent = money(budgets.reduce((sum, b) => sum + b.remaining, 0));
+  $('budget-empty').hidden = budgets.length > 0;
   $('budget-list').replaceChildren(...budgets.map((b, i) => {
     const card = document.createElement('button');
     card.type = 'button'; card.className = 'budget-card';
@@ -175,13 +180,45 @@ $('budget-form').onsubmit = e => {
     }
   } catch (error) { $('budget-error').textContent = error.message; }
 };
-$('add-budget').onclick = () => { $('new-budget-form').reset(); $('new-budget-error').textContent = ''; $('new-budget-dialog').showModal(); };
+$('add-budget').onclick = () => openAllocationForm();
 $('cancel-new-budget').onclick = () => $('new-budget-dialog').close();
 $('new-budget-form').onsubmit = e => {
   e.preventDefault();
   try {
+    if (editingBudget) {
+      if (save(editBudget(state, editingBudget, $('new-budget-name').value, $('new-budget-icon').value))) $('new-budget-dialog').close();
+      return;
+    }
     const value = $('new-budget-amount').value.trim();
     const amount = /^0(?:\.0{1,2})?$/.test(value) ? 0 : amountInPence(value);
     if (save(createBudget(state, $('new-budget-name').value, amount, $('new-budget-icon').value))) $('new-budget-dialog').close();
   } catch (error) { $('new-budget-error').textContent = error.message; }
+};
+
+$('history-toggle').onclick = () => { historyExpanded = !historyExpanded; render(); };
+function openAllocationForm(budget) {
+  editingBudget = budget?.id;
+  $('new-budget-form').reset();
+  $('new-budget-error').textContent = '';
+  $('allocation-form-title').textContent = budget ? 'Edit allocation' : 'Add spending allocation';
+  $('save-allocation').textContent = budget ? 'Save changes' : 'Add allocation';
+  $('starting-budget-field').hidden = !!budget;
+  $('new-budget-amount').required = !budget;
+  if (budget) {
+    $('new-budget-name').value = budget.name;
+    $('new-budget-icon').value = budget.icon;
+  }
+  $('new-budget-dialog').showModal();
+}
+$('edit-budget').onclick = () => {
+  const budget = (state.budgets ?? initialBudgets()).find(b => b.id === selectedBudget);
+  if (!budget) return;
+  $('budget-dialog').close();
+  openAllocationForm(budget);
+};
+$('delete-budget').onclick = () => {
+  const budget = (state.budgets ?? initialBudgets()).find(b => b.id === selectedBudget);
+  if (budget && confirm(`Delete “${budget.name}” and its remaining ${money(budget.remaining)} allocation? Your debt balances will stay the same.`)) {
+    if (save(deleteBudget(state, budget.id))) $('budget-dialog').close();
+  }
 };

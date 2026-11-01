@@ -42,10 +42,7 @@ export function migrateState(state) {
   return { ...state, balances, history: state.history.map(h => h?.category === 'Plana' ? { ...h, category: 'Klarna' } : h) };
 }
 
-export const initialBudgets = () => [
-  {id: 'groceries', name: 'Groceries', icon: '🛒', remaining: 0, allocated: 0},
-  {id: 'shopping', name: 'Shopping', icon: '🛍️', remaining: 0, allocated: 0}
-];
+export const initialBudgets = () => [];
 export function validBudgets(items) {
   return Array.isArray(items) && new Set(items.map(b => b?.id)).size === items.length && items.every(b => b && typeof b.id === 'string' && validName(b.name) && typeof b.icon === 'string' && b.icon.length <= 12 && Number.isSafeInteger(b.remaining) && b.remaining >= 0 && Number.isSafeInteger(b.allocated) && b.allocated >= b.remaining);
 }
@@ -55,6 +52,7 @@ export function createBudget(state, name, amount, icon = '🧾') {
   if (!validName(name)) throw new Error('Enter a name between 1 and 60 characters.');
   if (budgets.some(b => b.name.toLowerCase() === name.toLowerCase())) throw new Error('An allocation with this name already exists.');
   if (!Number.isSafeInteger(amount) || amount < 0) throw new Error('Enter a valid budget amount.');
+  icon = validateBudgetIcon(icon);
   return {...state, budgets: [...budgets, {id: crypto.randomUUID(), name, icon, remaining: amount, allocated: amount}]};
 }
 export function adjustBudget(state, id, amount, action) {
@@ -69,4 +67,24 @@ export function adjustBudget(state, id, amount, action) {
     if (!Number.isSafeInteger(remaining) || !Number.isSafeInteger(allocated)) throw new Error('This amount is too large.');
     return {...b, remaining, allocated};
   })};
+}
+
+function validateBudgetIcon(icon) {
+  icon = String(icon).trim();
+  if (!icon || icon.length > 12 || [...new Intl.Segmenter('en', {granularity: 'grapheme'}).segment(icon)].length !== 1 || !/\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20e3/u.test(icon)) throw new Error('Choose one emoji using your keyboard.');
+  return icon;
+}
+export function editBudget(state, id, name, icon) {
+  const budgets = state.budgets ?? initialBudgets();
+  name = String(name).trim();
+  if (!budgets.some(b => b.id === id)) throw new Error('Choose an allocation.');
+  if (!validName(name)) throw new Error('Enter a name between 1 and 60 characters.');
+  if (budgets.some(b => b.id !== id && b.name.toLowerCase() === name.toLowerCase())) throw new Error('An allocation with this name already exists.');
+  icon = validateBudgetIcon(icon);
+  return {...state, budgets: budgets.map(b => b.id === id ? {...b, name, icon} : b)};
+}
+export function deleteBudget(state, id) {
+  const budgets = state.budgets ?? initialBudgets();
+  if (!budgets.some(b => b.id === id)) throw new Error('Choose an allocation.');
+  return {...state, budgets: budgets.filter(b => b.id !== id)};
 }
